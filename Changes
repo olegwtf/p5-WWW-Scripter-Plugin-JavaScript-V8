@@ -1,0 +1,6 @@
+Revision history for Perl extension WWW::Scripter::Plugin::JavaScript::V8.
+
+0.01  Sat Dec  3 14:49:13 2011
+	- original version; created by h2xs 1.23 with options
+		-cfn WWW::Scripter::Plugin::JavaScript::V8
+
