@@ -10,39 +10,47 @@ our $VERSION = '0.01';
 
 sub new {
 	my ($class, $scripter) = @_;
-	my $self = {cntx => JavaScript::V8::Context->new()};
+	
+	my $cntx = JavaScript::V8::Context->new();
+	$cntx->name_global('window');
+	
+	my $self = {cntx => $cntx};
 	
 	my @methods = grep !/^_/ && $WWW::Scripter::WindowInterface{$_}&METHOD, 
 		keys %WWW::Scripter::WindowInterface;
+	
 	foreach my $method (@methods) {
 		if ($WWW::Scripter::WindowInterface{$method}&TYPE == NUM) {
-			$self->{cntx}->bind($method => sub {
+			$cntx->bind($method => sub {
 				0+$scripter->$method(@_);
 			});
 		}
 		else {
-			$self->{cntx}->bind($method => sub {
+			$cntx->bind($method => sub {
 				$scripter->$method(@_);
 			});
 		}
 	}
 	
-	my $create_prop_getter = $self->{cntx}->eval(
+	my $prop_getter = $self->{cntx}->eval(
 		'0,function(p,f){__defineGetter__(p, function(){return f()})}'
 	);
-	my $create_prop_setter = $self->{cntx}->eval(
+	my $prop_setter = $self->{cntx}->eval(
 		'0,function(p,f){__defineSetter__(p, function(v){f(v)})}'
 	);
+	
 	my @props = grep !/^_/ && !($WWW::Scripter::WindowInterface{$_}&METHOD),
 		keys %WWW::Scripter::WindowInterface;
 	
 	foreach my $property (@props) {
-		$create_prop_getter->($property, sub{
+		$prop_getter->($property, sub {
+			#warn "Prop getter $property";
 			$scripter->$property;
 		});
 		
 		unless ($WWW::Scripter::WindowInterface{$property}&READONLY) {
-			$create_prop_setter->($property, sub {
+			$prop_setter->($property, sub {
+				#warn "Prop setter $property";
 				$scripter->$property(@_);
 			});
 		}
@@ -53,63 +61,45 @@ sub new {
 
 sub bind_classes {
 	my ($self, $classes) = @_;
+	
+	for my $module (grep /::/, keys %$classes) {
+		my $interface = $classes->{$classes->{$module}};
+		
+		if ($interface->{_hash} || $interface->{_array}) {
+			my %props;
+			my %methods;
+			my $i = $interface;
+			
+			do {
+				my @methods = grep /^_/ && !($i->{$_}&METHOD),
+					keys %$interface;
+				
+				for my $method (@methods) {
+					$pmethods{$method} = undef;
+				}
+				
+				my @props = grep /^_/ && !($i->{$property}&METHOD),
+					keys %$interface;
+				
+				for my $property (@props) {
+					$props{$property} = undef;
+				}
+				
+			} while ($i = $classes->{$i->{_isa}});
+			
+			#$self->[hash]{$_} = [
+			#@$i{'_array','_hash'},\%props,\%methods
+			#];
+		}
+		else {
+			
+		}
 }
 
 sub eval {
+	#warn "EVAL";
 	my ($self, $code, $url, $line) = @_;
-	#$self->{cntx}->bind(print => sub{print @_});
-	#$self->{cntx}->eval("print(typeof document)");
+	$self->{cntx}->eval($code, $url);
 }
 
 1;
-__END__
-# Below is stub documentation for your module. You'd better edit it!
-
-=head1 NAME
-
-WWW::Scripter::Plugin::JavaScript::V8 - Perl extension for blah blah blah
-
-=head1 SYNOPSIS
-
-  use WWW::Scripter::Plugin::JavaScript::V8;
-  blah blah blah
-
-=head1 DESCRIPTION
-
-Stub documentation for WWW::Scripter::Plugin::JavaScript::V8, created by h2xs. It looks like the
-author of the extension was negligent enough to leave the stub
-unedited.
-
-Blah blah blah.
-
-=head2 EXPORT
-
-None by default.
-
-
-
-=head1 SEE ALSO
-
-Mention other useful documentation such as the documentation of
-related modules or operating system documentation (such as man pages
-in UNIX), or any relevant external documentation such as RFCs or
-standards.
-
-If you have a mailing list set up for your module, mention it here.
-
-If you have a web site set up for your module, mention it here.
-
-=head1 AUTHOR
-
-Oleg G, E<lt>oleg@E<gt>
-
-=head1 COPYRIGHT AND LICENSE
-
-Copyright (C) 2011 by Oleg G
-
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.12.4 or,
-at your option, any later version of Perl 5 you may have available.
-
-
-=cut
